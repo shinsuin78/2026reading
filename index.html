@@ -236,10 +236,29 @@
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, addDoc, collection, getDocs, serverTimestamp, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'beombak-reading-app';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-            apiKey: "demo-key", authDomain: "demo.firebaseapp.com", projectId: "demo-project", storageBucket: "demo.appspot.com", messagingSenderId: "12345", appId: "1:12345:web:abc"
+        // =========================================================================
+        // [중요] 깃허브 호스팅을 위한 설정 부분
+        // 깃허브에 올릴 때는 아래 두 가지 정보를 직접 입력해야 정상 작동합니다.
+        // =========================================================================
+
+        // 1. 구글 Gemini API 키 (독서 기록 자동 생성용)
+        // https://aistudio.google.com/app/apikey 에서 발급받은 API 키를 따옴표 안에 넣으세요.
+        const GEMINI_API_KEY = "AQ.Ab8RN6L5ejdpHH9FJ2GQYLxsSjLGQT-nPtQifsfYsYXJ28r9fw"; 
+
+        // 2. Firebase 설정 (회원가입 및 데이터 저장용)
+        // Firebase 콘솔에서 발급받은 본인의 firebaseConfig 객체로 아래 내용을 교체하세요.
+        const myFirebaseConfig = {
+            apiKey: "여기에_FIREBASE_API_KEY를_입력하세요",
+            authDomain: "본인의_authDomain.firebaseapp.com",
+            projectId: "본인의_projectId",
+            storageBucket: "본인의_storageBucket.appspot.com",
+            messagingSenderId: "본인의_messagingSenderId",
+            appId: "본인의_appId"
         };
+        // =========================================================================
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'beombak-reading-app';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : myFirebaseConfig;
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
@@ -380,11 +399,18 @@
                 if (typeof __initial_auth_token !== 'undefined') {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
+                    if (firebaseConfig.projectId === "demo-project" || firebaseConfig.projectId === "본인의_projectId") {
+                        throw new Error("실제 Firebase 설정이 누락되었습니다.");
+                    }
                     await signInAnonymously(auth);
                 }
             } catch (error) {
                 console.error("Firebase Auth Error:", error);
-                showToast("서버 연결에 실패했습니다.", "error");
+                if (error.message.includes("실제 Firebase 설정이 누락")) {
+                    showToast("깃허브 호스팅 설정 오류: 코드에 Firebase 키를 입력해주세요.", "error");
+                } else {
+                    showToast("서버 연결에 실패했습니다. Firebase 설정을 확인해주세요.", "error");
+                }
             }
         }
 
@@ -555,7 +581,9 @@
                 contents: [{ parts: [{ text: prompt }] }],
                 systemInstruction: { parts: [{ text: "당신은 고등학교 선생님입니다. 학생이 작성한 독서 감상문을 바탕으로 학교생활기록부 교과세부능력 및 특기사항(세특)에 들어갈 문구를 규정에 맞게 작성합니다." }] }
             };
-            const apiKey = ""; // Left empty for Canvas to inject
+            
+            // 캔버스 환경에서는 빈 문자열로 두면 자동 처리되지만, 외부(깃허브)에서는 직접 발급받은 키를 사용해야 합니다.
+            const apiKey = GEMINI_API_KEY === "여기에_GEMINI_API_KEY를_입력하세요" ? "" : GEMINI_API_KEY; 
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
 
             try {
